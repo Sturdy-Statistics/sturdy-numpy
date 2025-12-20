@@ -2,6 +2,12 @@
 
 A small, focused Clojure library for reading NumPy `.npy` files.
 
+[![Clojars Project](https://img.shields.io/clojars/v/com.sturdystats/sturdy-numpy.svg)](https://clojars.org/com.sturdystats/sturdy-numpy)
+
+```clj
+com.sturdystats/sturdy-numpy {:mvn/version "VERSION"}
+```
+
 ## Features
 
 - Reads NumPy `.npy` files (binary array format)
