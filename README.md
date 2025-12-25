@@ -250,6 +250,12 @@ This makes `npy->dataset-unnested-nz` significantly more memory-efficient than d
 - Memory-mapped or streaming IO
 - Writing `.npy` files
 
+## License
+
+Apache License 2.0
+
+Copyright © Sturdy Statistics
+
 <!-- Local Variables: -->
 <!-- fill-column: 10000000 -->
 <!-- End: -->
