@@ -1,0 +1,10 @@
+{:hooks
+ {:analyze-call
+  {sturdy.numpy.dataset/def-transposer
+   hooks.sturdy.numpy.dataset/def-transposer
+
+   sturdy.numpy.dataset/def-splitter
+   hooks.sturdy.numpy.dataset/def-splitter
+
+   sturdy.numpy.dataset-unnest/def-unnester-skip-zeros
+   hooks.sturdy.numpy.dataset-unnest/def-unnester-skip-zeros}}}

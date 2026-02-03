@@ -3,7 +3,7 @@
 
         ;; file system
         babashka/fs                 {:mvn/version "0.5.27"}
-        com.sturdystats/sturdy-fs   {:mvn/version "0.1.2"}
+        com.sturdystats/sturdy-fs   {:mvn/version "0.1.5"}
 
         ;; dataframe
         techascent/tech.ml.dataset  {:mvn/version "7.067"}}

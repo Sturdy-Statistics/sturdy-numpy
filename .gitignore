@@ -2,3 +2,4 @@
 .cpcache
 target
 *.pom.asc
+.clj-kondo/.cache/

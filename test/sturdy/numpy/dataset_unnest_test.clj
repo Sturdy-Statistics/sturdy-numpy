@@ -75,7 +75,7 @@
 (defn- expected-nnz
   "Count nonzeros in the expected dense data for shape+dtype."
   [shape dtype]
-  (let [[rows cols] (shape->rows-cols shape)
+  (let [[_rows cols] (shape->rows-cols shape)
         exp (expected-cols shape dtype)]
     (reduce
      (fn [acc j]
