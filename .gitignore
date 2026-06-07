@@ -3,3 +3,6 @@
 target
 *.pom.asc
 .clj-kondo/.cache/
+clj-watson.properties
+*.md
+*.qmd
