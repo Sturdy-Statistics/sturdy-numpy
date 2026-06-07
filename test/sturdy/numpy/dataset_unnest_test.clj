@@ -8,6 +8,8 @@
    [sturdy.numpy.test-utils :refer [resource-path]]
    [sturdy.numpy.read-test :refer [expected-vals-1d]]))
 
+(set! *warn-on-reflection* true)
+
 ;; ---- Shared expected helpers (reuse your existing logic) ----
 
 (defn expected-cols

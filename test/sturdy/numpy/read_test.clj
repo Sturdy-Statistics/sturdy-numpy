@@ -5,6 +5,8 @@
    [sturdy.numpy.test-utils :refer [resource-path]]
    [sturdy.numpy.read :refer [read-npy]]))
 
+(set! *warn-on-reflection* true)
+
 (defn- get-shape [vec-of-vecs]
   (let [rows (count vec-of-vecs)
         el   (first vec-of-vecs)

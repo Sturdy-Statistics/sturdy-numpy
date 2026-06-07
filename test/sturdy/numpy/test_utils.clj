@@ -2,6 +2,8 @@
   (:require
    [clojure.java.io :as io]))
 
+(set! *warn-on-reflection* true)
+
 (def ^:private fixtures-dir "npy-fixtures")
 
 (defn resource-path ^String [filename]

@@ -5,6 +5,8 @@
    [sturdy.numpy.header :refer [parse-npy-header]]
    [sturdy.numpy.dtype :refer [dtype->bytes+reader]]))
 
+(set! *warn-on-reflection* true)
+
 (defn- read-values
   "Decode payload bytes into a flat Java primitive array."
   [^bytes bs data-start {:keys [nbytes reader]}]
@@ -31,7 +33,7 @@
        (vec
         (for [c (range cols)]
           ;; Reflection here is expected: arr may be any primitive array type.
-          (aget arr (pos r c))))))))
+          (java.lang.reflect.Array/get arr (pos r c))))))))
 
 (defn- array->vec
   [arr shape fortran?]

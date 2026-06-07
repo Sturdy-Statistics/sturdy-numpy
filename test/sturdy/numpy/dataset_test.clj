@@ -8,6 +8,8 @@
    [sturdy.numpy.test-utils :refer [resource-path]]
    [sturdy.numpy.read-test :refer [expected-vals-1d]]))
 
+(set! *warn-on-reflection* true)
+
 (defn expected-cols
   "Return a vector of expected column vectors for given shape+dtype,
    assuming the file data is row-major (C-order) and we build a columnar dataset."

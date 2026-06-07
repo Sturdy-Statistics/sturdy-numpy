@@ -5,6 +5,8 @@
    [sturdy.numpy.test-utils :refer [resource-path]]
    [sturdy.numpy.magic :refer [read-header-string]]))
 
+(set! *warn-on-reflection* true)
+
 (deftest read-header-string-smoke
   (testing "read-header-string returns the expected header contents (up to whitespace)"
     (let [bs   (sfs/slurp-bytes (resource-path "shape_2x3__dtype_f4.npy"))

@@ -5,6 +5,8 @@
    [sturdy.numpy.dataset-list :as l]
    [sturdy.numpy.dataset-unnest :as u]))
 
+(set! *warn-on-reflection* true)
+
 (defn npy->vec
   "Read a NumPy `.npy` file and return its contents as idiomatic Clojure data.
 

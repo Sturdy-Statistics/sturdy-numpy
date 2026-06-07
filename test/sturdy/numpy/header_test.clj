@@ -5,6 +5,8 @@
    [sturdy.numpy.test-utils :refer [resource-path]]
    [sturdy.numpy.header :refer [parse-npy-header]]))
 
+(set! *warn-on-reflection* true)
+
 (deftest parse-npy-header-basic-1d
   (testing "parse-npy-header parses a 1D u4 fixture"
     (let [bs  (sfs/slurp-bytes (resource-path "shape_10___dtype_u4.npy"))
@@ -44,7 +46,7 @@
 
 (deftest parse-npy-header-data-start-consistency
   (testing ":data-start lands at the end of the header"
-    (let [bs (sfs/slurp-bytes (resource-path "shape_2x3__dtype_u2.npy"))
+    (let [^bytes bs (sfs/slurp-bytes (resource-path "shape_2x3__dtype_u2.npy"))
           ;; if you have read-header-string or read-header-len exposed internally,
           ;; skip this test; otherwise just do a basic sanity bound check:
           hdr (parse-npy-header bs)
