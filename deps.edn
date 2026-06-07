@@ -18,7 +18,7 @@
             :exec-fn     cognitect.test-runner.api/test}
 
            :coverage
-           {:extra-paths ["test"]
+           {:extra-paths ["test" "test-resources"]
             :extra-deps  {cloverage/cloverage {:mvn/version "1.2.4"}}
             :exec-fn     cloverage.coverage/run-project
             :exec-args   {:src-ns-path  ["src"]
