@@ -56,23 +56,41 @@
              ~cola (short-array ~nnz)
              ~vala (~val-array-ctor ~nnz)]
          ;; pass 2: fill
-         (loop [k# 0
-                out# 0]
-           (when (< k# ~n)
-             (let [v# (aget ~src k#)]
-               (if (== v# ~zero-lit)
-                 (recur (long (inc k#)) out#)
-                 (let [kL# (long k#)
-                       r#  (if ~fortran?
-                             (long (rem kL# (long ~rows)))
-                             (long (quot kL# (long ~cols))))
-                       c#  (if ~fortran?
-                             (long (quot kL# (long ~rows)))
-                             (long (rem kL# (long ~cols))))]
-                   (aset-long  ~rowa out# r#)
-                   (aset-short ~cola out# (short c#))
-                   (~aset-val  ~vala out# v#)
-                   (recur (long (inc k#)) (long (inc out#))))))))
+         (if ~fortran?
+           (loop [k# 0
+                  r# 0
+                  c# 0
+                  out# 0]
+             (when (< k# ~n)
+               (let [v# (aget ~src k#)
+                     next-r# (long (inc r#))
+                     wrap-r?# (== next-r# (long ~rows))
+                     r'#     (if wrap-r?# 0 next-r#)
+                     c'#     (if wrap-r?# (long (inc c#)) c#)]
+                 (if (== v# ~zero-lit)
+                   (recur (long (inc k#)) (long r'#) (long c'#) out#)
+                   (do
+                     (aset-long  ~rowa out# r#)
+                     (aset-short ~cola out# (short c#))
+                     (~aset-val  ~vala out# v#)
+                     (recur (long (inc k#)) (long r'#) (long c'#) (long (inc out#))))))))
+           (loop [k# 0
+                  r# 0
+                  c# 0
+                  out# 0]
+             (when (< k# ~n)
+               (let [v# (aget ~src k#)
+                     next-c# (long (inc c#))
+                     wrap-c?# (== next-c# (long ~cols))
+                     c'#     (if wrap-c?# 0 next-c#)
+                     r'#     (if wrap-c?# (long (inc r#)) r#)]
+                 (if (== v# ~zero-lit)
+                   (recur (long (inc k#)) (long r'#) (long c'#) out#)
+                   (do
+                     (aset-long  ~rowa out# r#)
+                     (aset-short ~cola out# (short c#))
+                     (~aset-val  ~vala out# v#)
+                     (recur (long (inc k#)) (long r'#) (long c'#) (long (inc out#)))))))))
          {:row_no ~rowa
           :col_no ~cola
           :val    ~vala}))))
