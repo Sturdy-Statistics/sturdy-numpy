@@ -10,8 +10,13 @@
 (defn- read-values
   "Decode payload bytes into a flat Java primitive array."
   [^bytes bs data-start {:keys [nbytes reader]}]
-  (let [payload (slice bs data-start (+ data-start nbytes))]
-    (reader payload)))
+  (let [available (- (alength bs) data-start)]
+    (when-not (= nbytes available)
+      (throw (ex-info "Invalid .npy payload size"
+                      {:expected nbytes
+                       :available available})))
+    (let [payload (slice bs data-start (+ data-start nbytes))]
+      (reader payload))))
 
 (defn- array->vec1d
   "Convert a flat primitive array to a Clojure vector."

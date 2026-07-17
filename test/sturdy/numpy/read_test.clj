@@ -1,9 +1,13 @@
 (ns sturdy.numpy.read-test
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.test :refer [deftest is testing]]
    [sturdy.numpy.test-utils :refer [resource-path]]
-   [sturdy.numpy.read :refer [read-npy]]))
+   [sturdy.numpy.read :refer [read-npy]])
+  (:import
+   (java.nio.file Files)
+   (java.util Arrays)))
 
 (set! *warn-on-reflection* true)
 
@@ -12,6 +16,20 @@
         el   (first vec-of-vecs)
         cols (when (vector? el) (count el))]
     (if cols [rows cols] [rows])))
+
+(defn- read-temp-npy-error [^bytes bs]
+  (let [path (Files/createTempFile "sturdy-numpy-payload-" ".npy"
+                                   (make-array java.nio.file.attribute.FileAttribute 0))]
+    (try
+      (with-open [out (io/output-stream (.toFile path))]
+        (.write ^java.io.OutputStream out bs))
+      (try
+        (read-npy (.toString path))
+        nil
+        (catch clojure.lang.ExceptionInfo e
+          e))
+      (finally
+        (Files/deleteIfExists path)))))
 
 ;; --- Expected value generators (must match make_npy_fixtures.py) ---
 
@@ -98,3 +116,24 @@
         (is (= [2 3] (get-shape res)) (str "shape mismatch for " fname))
         (is (= (expected-data [2 3] dtype) res)
             (str "data mismatch for " fname))))))
+
+(deftest read-npy-rejects-invalid-payload-length
+  (let [fixture       (resource-path "shape_2x3__dtype_i4.npy")
+        bs            (Files/readAllBytes (.toPath (io/file fixture)))
+        payload-size  24
+        data-start    (- (alength bs) payload-size)]
+    (doseq [[label altered expected available]
+            [["one complete element is missing"
+              (Arrays/copyOf bs (- (alength bs) 4)) payload-size 20]
+             ["part of a multibyte element is missing"
+              (Arrays/copyOf bs (dec (alength bs))) payload-size 23]
+             ["the entire payload is missing"
+              (Arrays/copyOf bs data-start) payload-size 0]
+             ["trailing bytes are present"
+              (Arrays/copyOf bs (inc (alength bs))) payload-size 25]]]
+      (testing label
+        (let [error (read-temp-npy-error altered)]
+          (is (instance? clojure.lang.ExceptionInfo error))
+          (is (= "Invalid .npy payload size" (ex-message error)))
+          (is (= {:expected expected :available available}
+                 (select-keys (ex-data error) [:expected :available]))))))))
