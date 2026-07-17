@@ -5,27 +5,60 @@
 
 (set! *warn-on-reflection* true)
 
+(def ^:private supported-dtypes
+  #{:u1 :u2 :u4
+    :i1 :i2 :i4 :i8
+    :f4 :f8})
+
+(defn- unsupported-descr [descr reason]
+  (throw (ex-info "Unsupported .npy dtype descriptor"
+                  {:descr descr :reason reason})))
+
+(defn- parse-descr-value [^String descr-value]
+  (let [[_ endian kind size-text]
+        (or (re-matches #"^([<>|])([uif])([0-9]+)$" descr-value)
+            (unsupported-descr descr-value :malformed))
+
+        size
+        (try
+          (Long/parseLong size-text)
+          (catch NumberFormatException _
+            (unsupported-descr descr-value :malformed)))
+
+        dtype (keyword (str kind size))]
+
+    (when (and (= "|" endian) (not= 1 size))
+      (unsupported-descr descr-value :invalid-byte-order))
+
+    (let [byte-order
+          (case endian
+            "<" :little
+            ">" :big
+            "|" :na)]
+
+      {:byte-order byte-order
+       :kind       kind
+       :size       size
+       :dtype      dtype})))
+
 (defn- parse-descr [^String hdr]
   ;; e.g. '<f4', '|u1', '>i8'
-  (let [m (re-find #"[\"']descr[\"']\s*:\s*[\"']([^\"']+)[\"']" hdr)]
+  (let [m (re-find #"[\"']descr[\"']\s*:\s*[\"']([^\"']*)[\"']" hdr)]
     (when-not m
       (throw (ex-info "Missing 'descr' in header" {:header hdr})))
-    (let [descr  (second m)
-          endian (subs descr 0 1)
-          kind   (subs descr 1 2)
-          size   (Long/parseLong (subs descr 2))
-          dtype  (keyword (str kind size))]
-      (when-not (#{"u" "i" "f"} kind)
-        (throw (ex-info "Unsupported dtype kind in descr" {:descr descr :kind kind})))
-      {:descr descr
-       :byte-order (case endian
-                     "<" :little
-                     ">" :big
-                     "|" :na
-                     (throw (ex-info "Unknown endianness in descr" {:descr descr})))
-       :kind kind
-       :size size
-       :dtype dtype})))
+    (let [descr-value (second m)
+
+          {:keys [byte-order kind size dtype]}
+          (parse-descr-value descr-value)]
+
+      (when-not (supported-dtypes dtype)
+        (unsupported-descr descr-value :unsupported-dtype))
+
+      {:descr      descr-value
+       :byte-order byte-order
+       :kind       kind
+       :size       size
+       :dtype      dtype})))
 
 (defn- parse-fortran-order [^String hdr]
   (let [m (re-find #"[\"']fortran_order[\"']\s*:\s*(True|False)" hdr)]

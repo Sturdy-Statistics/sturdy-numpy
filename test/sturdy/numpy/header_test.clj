@@ -116,3 +116,31 @@
         (is (= {:shape expected-shape :dimension -1 :reason :negative}
                (select-keys (ex-data error)
                             [:shape :dimension :reason])))))))
+
+(deftest parse-npy-header-validates-complete-dtype-descriptor
+  (testing "the no-endianness marker is accepted for one-byte dtypes"
+    (doseq [[filename expected]
+            [["shape_2x3__dtype_i1.npy" :i1]
+             ["shape_2x3__dtype_u1.npy" :u1]]]
+      (let [hdr (parse-npy-header (sfs/slurp-bytes (resource-path filename)))]
+        (is (= expected (:dtype hdr)))
+        (is (= :na (:byte-order hdr))))))
+
+  (testing "malformed and unsupported descriptors are rejected during parsing"
+    (doseq [[old new descr reason]
+            [["<i4" "|i4" "|i4" :invalid-byte-order]
+             ["<i4" "<i3" "<i3" :unsupported-dtype]
+             ["<i4" "<f9" "<f9" :unsupported-dtype]
+             ["<i4" "<S4" "<S4" :malformed]
+             ["<i4" "=i4" "=i4" :malformed]
+             ["'<i4'" "'i'  " "i" :malformed]
+             ["'<i4'" "''   " "" :malformed]]]
+      (let [error (try
+                    (parse-npy-header
+                     (replace-fixture-text "shape_2x3__dtype_i4.npy" old new))
+                    nil
+                    (catch clojure.lang.ExceptionInfo e
+                      e))]
+        (is (= "Unsupported .npy dtype descriptor" (ex-message error)))
+        (is (= {:descr descr :reason reason}
+               (select-keys (ex-data error) [:descr :reason])))))))
