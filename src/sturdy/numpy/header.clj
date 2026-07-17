@@ -45,6 +45,12 @@
           dims   (mapv #(Long/parseLong %) parts)]
       (when-not (or (= 1 (count dims)) (= 2 (count dims)))
         (throw (ex-info "Only 1D/2D shapes supported" {:shape dims :header hdr})))
+      (doseq [dimension dims]
+        (when (neg? dimension)
+          (throw (ex-info "Invalid .npy shape dimension"
+                          {:shape dims
+                           :dimension dimension
+                           :reason :negative}))))
       dims)))
 
 (defn parse-npy-header

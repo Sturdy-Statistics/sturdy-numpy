@@ -4,6 +4,68 @@
 
 (set! *warn-on-reflection* true)
 
+(def ^:private max-array-length (long Integer/MAX_VALUE))
+
+(defn- shape->element-count
+  "Validate a parsed shape and return its element count.
+
+   Java primitive arrays and the indexing used by this library are limited to
+   `Integer/MAX_VALUE` dimensions and elements. Zero-length dimensions are
+   valid and produce an element count of zero."
+  [shape]
+  (doseq [dimension shape]
+    (when (neg? dimension)
+      (throw (ex-info "Invalid .npy shape dimension"
+                      {:shape shape
+                       :dimension dimension
+                       :reason :negative}))))
+  (let [element-count
+        (try
+          (reduce (fn [^long total dimension]
+                    (Math/multiplyExact total (long dimension)))
+                  1
+                  shape)
+          (catch ArithmeticException cause
+            (throw (ex-info "Invalid .npy element count"
+                            {:shape shape
+                             :reason :arithmetic-overflow}
+                            cause))))]
+    (doseq [dimension shape]
+      (when (> dimension max-array-length)
+        (throw (ex-info "Unsupported .npy shape dimension"
+                        {:shape shape
+                         :dimension dimension
+                         :maximum max-array-length
+                         :reason :array-index-limit}))))
+    (when (> element-count max-array-length)
+      (throw (ex-info "Unsupported .npy element count"
+                      {:shape shape
+                       :element-count element-count
+                       :maximum max-array-length
+                       :reason :array-index-limit})))
+    element-count))
+
+(defn- payload-size [size shape]
+  (let [element-count (shape->element-count shape)]
+    (try
+      (let [nbytes (Math/multiplyExact (long size) (long element-count))]
+        (when (> nbytes max-array-length)
+          (throw (ex-info "Unsupported .npy payload size"
+                          {:shape shape
+                           :element-count element-count
+                           :size size
+                           :nbytes nbytes
+                           :maximum max-array-length
+                           :reason :array-index-limit})))
+        nbytes)
+      (catch ArithmeticException cause
+        (throw (ex-info "Invalid .npy payload size"
+                        {:shape shape
+                         :element-count element-count
+                         :size size
+                         :reason :arithmetic-overflow}
+                        cause))))))
+
 (defn- bo->nio ^ByteOrder [bo]
   (case bo
     :little ByteOrder/LITTLE_ENDIAN
@@ -83,6 +145,6 @@
   {:dtype   dtype
    :size    size
    :shape   shape
-   :nbytes  (* size (reduce * 1 shape))
+   :nbytes  (payload-size size shape)
    :reader  (fn [^bytes payload]
               (decode-into payload dtype byte-order))})

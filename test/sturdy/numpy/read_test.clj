@@ -4,7 +4,7 @@
    [clojure.string :as string]
    [clojure.test :refer [deftest is testing]]
    [sturdy.numpy.test-utils :refer [resource-path]]
-   [sturdy.numpy.read :refer [read-npy]])
+   [sturdy.numpy.read :refer [read-npy read-npy-primitive]])
   (:import
    (java.nio.file Files)
    (java.util Arrays)))
@@ -17,19 +17,22 @@
         cols (when (vector? el) (count el))]
     (if cols [rows cols] [rows])))
 
-(defn- read-temp-npy-error [^bytes bs]
+(defn- read-temp-npy [^bytes bs read-fn]
   (let [path (Files/createTempFile "sturdy-numpy-payload-" ".npy"
                                    (make-array java.nio.file.attribute.FileAttribute 0))]
     (try
       (with-open [out (io/output-stream (.toFile path))]
         (.write ^java.io.OutputStream out bs))
-      (try
-        (read-npy (.toString path))
-        nil
-        (catch clojure.lang.ExceptionInfo e
-          e))
+      (read-fn (.toString path))
       (finally
         (Files/deleteIfExists path)))))
+
+(defn- read-temp-npy-error [^bytes bs]
+  (try
+    (read-temp-npy bs read-npy)
+    nil
+    (catch clojure.lang.ExceptionInfo e
+      e)))
 
 ;; --- Expected value generators (must match make_npy_fixtures.py) ---
 
@@ -137,3 +140,21 @@
           (is (= "Invalid .npy payload size" (ex-message error)))
           (is (= {:expected expected :available available}
                  (select-keys (ex-data error) [:expected :available]))))))))
+
+(deftest read-npy-primitive-supports-zero-length-dimensions
+  (let [fixture      (resource-path "shape_2x3__dtype_i4.npy")
+        bs           (Files/readAllBytes (.toPath (io/file fixture)))
+        payload-size 24
+        data-start   (- (alength bs) payload-size)
+        charset      java.nio.charset.StandardCharsets/ISO_8859_1
+        content      (String. ^bytes bs charset)]
+    (doseq [[shape replacement] [[[0 3] "(0, 3)"]
+                                 [[4 0] "(4, 0)"]]]
+      (testing (str "shape " shape)
+        (let [changed (.getBytes ^String
+                                 (string/replace-first content "(2, 3)" replacement)
+                                 charset)
+              empty-file (Arrays/copyOf changed data-start)
+              result     (read-temp-npy empty-file read-npy-primitive)]
+          (is (= shape (:shape result)))
+          (is (= 0 (alength ^ints (:data result)))))))))

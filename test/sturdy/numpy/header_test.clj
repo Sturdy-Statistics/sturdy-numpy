@@ -1,11 +1,19 @@
 (ns sturdy.numpy.header-test
   (:require
+   [clojure.string :as string]
    [clojure.test :refer [deftest is testing]]
    [sturdy.fs :as sfs]
    [sturdy.numpy.test-utils :refer [resource-path]]
    [sturdy.numpy.header :refer [parse-npy-header]]))
 
 (set! *warn-on-reflection* true)
+
+(defn- replace-fixture-text ^bytes [filename old new]
+  {:pre [(= (count old) (count new))]}
+  (let [charset java.nio.charset.StandardCharsets/ISO_8859_1
+        bs      (sfs/slurp-bytes (resource-path filename))
+        content (String. ^bytes bs charset)]
+    (.getBytes ^String (string/replace-first content old new) charset)))
 
 (deftest parse-npy-header-basic-1d
   (testing "parse-npy-header parses a 1D u4 fixture"
@@ -87,3 +95,24 @@
         (is (= false (:fortran? hdr)) (str "fortran? mismatch for " fname))
         (is (= [2 3] (:shape hdr)) (str "shape mismatch for " fname))
         (is (pos-int? (:data-start hdr)) (str "data-start invalid for " fname))))))
+
+(deftest parse-npy-header-shape-dimensions
+  (testing "zero-length dimensions are valid"
+    (let [one-d (replace-fixture-text "shape_10___dtype_u4.npy" "(10,)" "(0, )")
+          two-d (replace-fixture-text "shape_2x3__dtype_u4.npy" "(2, 3)" "(0, 3)")]
+      (is (= [0] (:shape (parse-npy-header one-d))))
+      (is (= [0 3] (:shape (parse-npy-header two-d))))))
+
+  (testing "negative dimensions are rejected"
+    (doseq [[filename old new expected-shape]
+            [["shape_10___dtype_u4.npy" "(10,)" "(-1,)" [-1]]
+             ["shape_2x3__dtype_u4.npy" "(2, 3)" "(-1,3)" [-1 3]]]]
+      (let [error (try
+                    (parse-npy-header (replace-fixture-text filename old new))
+                    nil
+                    (catch clojure.lang.ExceptionInfo e
+                      e))]
+        (is (= "Invalid .npy shape dimension" (ex-message error)))
+        (is (= {:shape expected-shape :dimension -1 :reason :negative}
+               (select-keys (ex-data error)
+                            [:shape :dimension :reason])))))))

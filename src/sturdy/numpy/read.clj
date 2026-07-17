@@ -10,12 +10,20 @@
 (defn- read-values
   "Decode payload bytes into a flat Java primitive array."
   [^bytes bs data-start {:keys [nbytes reader]}]
-  (let [available (- (alength bs) data-start)]
+  (let [data-end (try
+                   (Math/addExact (long data-start) (long nbytes))
+                   (catch ArithmeticException cause
+                     (throw (ex-info "Invalid .npy data offset"
+                                     {:data-start data-start
+                                      :nbytes nbytes
+                                      :reason :arithmetic-overflow}
+                                     cause))))
+        available (- (alength bs) data-start)]
     (when-not (= nbytes available)
       (throw (ex-info "Invalid .npy payload size"
                       {:expected nbytes
                        :available available})))
-    (let [payload (slice bs data-start (+ data-start nbytes))]
+    (let [payload (slice bs data-start data-end)]
       (reader payload))))
 
 (defn- array->vec1d
