@@ -121,21 +121,23 @@
 
 (defn npy->dataset-unnested-nz
   "Same as npy->dataset-unnested, but skips val==0 (2-pass)."
-  [path]
-  (let [{:keys [shape dtype fortran? data]} (read-npy-primitive path)
-        [rows cols] (shape->rows-cols shape)
-        _ (when (>= cols 32768)
-            (throw (ex-info "cols too large for short col_no" {:cols cols})))
+  ([path]
+   (npy->dataset-unnested-nz path nil))
+  ([path options]
+   (let [{:keys [shape dtype fortran? data]} (read-npy-primitive path options)
+         [rows cols] (shape->rows-cols shape)
+         _ (when (>= cols 32768)
+             (throw (ex-info "cols too large for short col_no" {:cols cols})))
 
-        ;; If 1D, treat as rows x 1 regardless of fortran?
-        fortran? (boolean (and (= 2 (count shape)) fortran?))
+         ;; If 1D, treat as rows x 1 regardless of fortran?
+         fortran? (boolean (and (= 2 (count shape)) fortran?))
 
-        f (dtype->unnester-nz dtype)
-        {:keys [row_no col_no val]} (f data rows cols fortran?)
+         f (dtype->unnester-nz dtype)
+         {:keys [row_no col_no val]} (f data rows cols fortran?)
 
-        ;; Preserve unsigned representation for DuckDB ingest (like before).
-        target (unsigned-val-dtype dtype)
-        val'   (if target (dtype/->array-buffer target val) val)]
-    (ds/->dataset {:row_no row_no
-                   :col_no col_no
-                   :val    val'})))
+         ;; Preserve unsigned representation for DuckDB ingest (like before).
+         target (unsigned-val-dtype dtype)
+         val'   (if target (dtype/->array-buffer target val) val)]
+     (ds/->dataset {:row_no row_no
+                    :col_no col_no
+                    :val    val'}))))

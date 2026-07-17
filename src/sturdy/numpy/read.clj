@@ -1,11 +1,39 @@
 (ns sturdy.numpy.read
   (:require
+   [babashka.fs :as fs]
    [sturdy.fs :as sfs]
    [sturdy.numpy.util :refer [slice]]
    [sturdy.numpy.header :refer [parse-npy-header]]
    [sturdy.numpy.dtype :refer [dtype->bytes+reader]]))
 
 (set! *warn-on-reflection* true)
+
+(def ^:private allowed-options #{:max-file-bytes})
+
+(defn- validate-options [options]
+  (let [options (or options {})]
+    (when-not (map? options)
+      (throw (ex-info "NumPy reader options must be a map"
+                      {:options options})))
+    (let [unknown-options (set (remove allowed-options (keys options)))]
+      (when (seq unknown-options)
+        (throw (ex-info "Unknown NumPy reader options"
+                        {:unknown-options unknown-options}))))
+    (let [max-file-bytes (:max-file-bytes options)]
+      (when (and (some? max-file-bytes)
+                 (not (and (integer? max-file-bytes)
+                           (<= 0 max-file-bytes Long/MAX_VALUE))))
+        (throw (ex-info "Invalid :max-file-bytes option"
+                        {:value max-file-bytes}))))
+    options))
+
+(defn- enforce-file-size-limit [actual maximum phase]
+  (when (and (some? maximum) (> actual maximum))
+    (throw (ex-info "NumPy file exceeds configured size limit"
+                    {:actual actual
+                     :maximum maximum
+                     :limit :max-file-bytes
+                     :phase phase}))))
 
 (defn- read-values
   "Decode payload bytes into a flat Java primitive array."
@@ -61,21 +89,33 @@
 
    Returns {:shape :dtype :fortran? :data} where `:data` is laid out according
    to `:fortran?` and no transposition or reshaping is performed."
-  [path]
-  (let [bs  (sfs/slurp-bytes path)
-        hdr (parse-npy-header bs)
-        {:keys [shape fortran? data-start] :as _hdr} hdr
-        spec (dtype->bytes+reader hdr)
-        arr  (read-values bs data-start spec)]
-    {:shape    shape
-     :dtype    (:dtype hdr)
-     :fortran? fortran?
-     :data     arr}))
+  ([path]
+   (read-npy-primitive path nil))
+  ([path options]
+   (let [{:keys [max-file-bytes]} (validate-options options)
+         _ (when (some? max-file-bytes)
+             (enforce-file-size-limit (fs/size path)
+                                      max-file-bytes
+                                      :before-read))
+         bs (sfs/slurp-bytes path)
+         _ (enforce-file-size-limit (alength ^bytes bs)
+                                    max-file-bytes
+                                    :after-read)
+         hdr (parse-npy-header bs)
+         {:keys [shape fortran? data-start] :as _hdr} hdr
+         spec (dtype->bytes+reader hdr)
+         arr (read-values bs data-start spec)]
+     {:shape    shape
+      :dtype    (:dtype hdr)
+      :fortran? fortran?
+      :data     arr})))
 
 (defn read-npy
   "Read a NumPy `.npy` file and return its contents as Clojure data.
 
    Returns a vector (1D) or vector of vectors (2D), always in row-major order."
-  [path]
-  (let [{:keys [shape fortran? data]} (read-npy-primitive path)]
-    (array->vec data shape fortran?)))
+  ([path]
+   (read-npy path nil))
+  ([path options]
+   (let [{:keys [shape fortran? data]} (read-npy-primitive path options)]
+     (array->vec data shape fortran?))))

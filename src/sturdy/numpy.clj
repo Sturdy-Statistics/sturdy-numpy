@@ -22,8 +22,10 @@
    - This representation is easy to inspect and test, but incurs allocation
      and boxing costs for large arrays. Prefer `npy->dataset` for performance-
      sensitive or columnar workloads."
-  [path]
-  (r/read-npy path))
+  ([path]
+   (r/read-npy path))
+  ([path options]
+   (r/read-npy path options)))
 
 (defn npy->dataset
   "Read a NumPy `.npy` file and return its contents as a `tech.v3.dataset`.
@@ -43,8 +45,10 @@
 
    This function avoids intermediate persistent collections and is the
    recommended entry point for large arrays or downstream analytics."
-  [path]
-  (d/npy->dataset path))
+  ([path]
+   (d/npy->dataset path))
+  ([path options]
+   (d/npy->dataset path options)))
 
 (defn npy->primitive
   "Read a NumPy `.npy` file and return its contents backed by primitive arrays.
@@ -65,8 +69,10 @@
 
    This function is intended for high-performance ingestion paths and serves
    as the foundation for `npy->dataset`."
-  [path]
-  (r/read-npy-primitive path))
+  ([path]
+   (r/read-npy-primitive path))
+  ([path options]
+   (r/read-npy-primitive path options)))
 
 (defn npy->dataset-rowlists
   "Read a 2D NumPy `.npy` file into a dataset with a single column `:c1`.
@@ -80,8 +86,10 @@
    - Fortran-order files are not currently supported by this helper.
    - The resulting column has elemwise dtype `:object` (each cell is a buffer).
      Some downstream systems may not accept object columns for bulk ingestion."
-  [path]
-  (l/npy->dataset-rowlists path))
+  ([path]
+   (l/npy->dataset-rowlists path))
+  ([path options]
+   (l/npy->dataset-rowlists path options)))
 
 (defn npy->dataset-unnested-nz
   "Read a NumPy `.npy` file and return a sparse, long-form `tech.v3.dataset`.
@@ -120,5 +128,7 @@
 
    If the array is dense or column-oriented access is required, prefer
    `npy->dataset`."
-  [path]
-  (u/npy->dataset-unnested-nz path))
+  ([path]
+   (u/npy->dataset-unnested-nz path))
+  ([path options]
+   (u/npy->dataset-unnested-nz path options)))

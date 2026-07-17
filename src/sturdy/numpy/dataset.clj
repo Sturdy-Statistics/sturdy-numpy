@@ -113,21 +113,24 @@
     (throw (ex-info "invalid shape (must be 1D or 2D)" {:shape shape}))))
 
 (defn npy->dataset
-  [path]
-  (let [{:keys [shape dtype _fortran? _data] :as spec} (read-npy-primitive path)
+  ([path]
+   (npy->dataset path nil))
+  ([path options]
+   (let [{:keys [shape dtype _fortran? _data] :as spec}
+         (read-npy-primitive path options)
 
-        _rows      (first shape)
-        cols       (if (= 1 (count shape)) 1 (second shape))
+         _rows      (first shape)
+         cols       (if (= 1 (count shape)) 1 (second shape))
 
-        col-data0  (data->cols spec)
-        target     (unsigned-col-dtype dtype)
-        col-data   (if target
-                     (mapv #(dtype/->array-buffer target %) col-data0)
-                     col-data0)
+         col-data0  (data->cols spec)
+         target     (unsigned-col-dtype dtype)
+         col-data   (if target
+                      (mapv #(dtype/->array-buffer target %) col-data0)
+                      col-data0)
 
-        col-names  (mapv #(keyword (str "c" (inc %)))
-                         (range cols))
+         col-names  (mapv #(keyword (str "c" (inc %)))
+                          (range cols))
 
-        result     (ds/->dataset (zipmap col-names col-data))]
+         result     (ds/->dataset (zipmap col-names col-data))]
 
-    (ds/select-columns result col-names)))
+     (ds/select-columns result col-names))))

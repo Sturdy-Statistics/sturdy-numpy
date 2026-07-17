@@ -25,25 +25,27 @@
    - Fortran-order files are not currently supported by this helper.
    - The resulting column has elemwise dtype `:object` (each cell is a buffer).
      Some downstream systems may not accept object columns for bulk ingestion."
-  [path]
-  (let [{:keys [shape dtype fortran? data]} (read-npy-primitive path)
-        _ (when-not (= 2 (count shape))
-            (throw (ex-info "npy->dataset-rowlists requires a 2D array"
-                            {:shape shape})))
-        _ (when fortran?
-            (throw (ex-info "npy->dataset-rowlists does not currently support Fortran-order files"
-                            {:shape shape})))
-        [rows cols] shape
+  ([path]
+   (npy->dataset-rowlists path nil))
+  ([path options]
+   (let [{:keys [shape dtype fortran? data]} (read-npy-primitive path options)
+         _ (when-not (= 2 (count shape))
+             (throw (ex-info "npy->dataset-rowlists requires a 2D array"
+                             {:shape shape})))
+         _ (when fortran?
+             (throw (ex-info "npy->dataset-rowlists does not currently support Fortran-order files"
+                             {:shape shape})))
+         [rows cols] shape
 
-        ;; Wrap unsigned arrays so consumers can observe uint* element types.
-        target (unsigned-target dtype)
-        buf    (if target
-                 (dtype/->array-buffer target data)
-                 (dtype/->buffer data))
+         ;; Wrap unsigned arrays so consumers can observe uint* element types.
+         target (unsigned-target dtype)
+         buf    (if target
+                  (dtype/->array-buffer target data)
+                  (dtype/->buffer data))
 
-        rowviews (mapv (fn [r]
-                         ;; zero-copy view into buf
-                         (dtype/sub-buffer buf (* r cols) cols))
-                       (range rows))]
+         rowviews (mapv (fn [r]
+                          ;; zero-copy view into buf
+                          (dtype/sub-buffer buf (* r cols) cols))
+                        (range rows))]
 
-    (ds/->dataset {:c1 rowviews})))
+     (ds/->dataset {:c1 rowviews}))))

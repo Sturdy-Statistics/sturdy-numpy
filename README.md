@@ -25,6 +25,26 @@ com.sturdystats/sturdy-numpy {:mvn/version "VERSION"}
 
 ## Example Usage
 
+### Optional file-size limit
+
+Every public reader accepts an optional options map containing `:max-file-bytes`:
+
+```clj
+(np/npy->dataset "array.npy" {:max-file-bytes (* 100 1024 1024)})
+```
+
+The limit applies to the complete `.npy` file, including its preamble, header, and payload.
+The reader checks the filesystem-reported size before loading the file and checks the resulting byte-array length again after loading.
+A file whose size is exactly the configured limit is accepted.
+
+Existing one-argument calls remain unchanged and have no configured file-size limit.
+`nil` also means unlimited.
+Unknown option keys and invalid limits are rejected so that a misspelled safety option cannot silently disable enforcement.
+
+The pre-read check has a minor time-of-check/time-of-use limitation: a file can change between the filesystem size check and `slurp-bytes`.
+The post-read check detects and rejects a file that grew beyond the limit, but only after that file has been allocated in memory.
+Callers requiring a strict allocation boundary against concurrently modified files should provide immutable inputs or enforce a bounded upload/read before calling this library.
+
 ### Clojure Vectors
 
 ```clj
