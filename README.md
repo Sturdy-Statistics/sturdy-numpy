@@ -250,6 +250,34 @@ This makes `npy->dataset-unnested-nz` significantly more memory-efficient than d
 - Memory-mapped or streaming IO
 - Writing `.npy` files
 
+## Known limitations
+
+### Header metadata containing required-field text
+
+The header reader intentionally supports the standard NumPy-emitted grammar for the numeric dtypes listed above; it is not a general Python-literal parser.
+It uses regular expressions to locate the required `descr`, `fortran_order`, and `shape` fields and to reject duplicate occurrences.
+
+As a result, text inside an otherwise ignored metadata value can be mistaken for another required field.
+For example, an extra string value containing text such as `"'shape':"` may be rejected as a duplicate `shape` field even when the header has only one top-level `shape` key.
+Ordinary NumPy numeric headers, reordered fields, normal whitespace and quote variations, and extra keys without this key-like text are supported.
+
+## Development notes
+
+### Coverage instrumentation and checked arithmetic
+
+The authoritative test command is:
+
+```sh
+clojure -X:test
+```
+
+The `:coverage` alias currently uses Cloverage 1.2.4.
+Its instrumentation obscures primitive type information around checked `Math/multiplyExact` and `Math/addExact` calls, which can change the behavior observed by arithmetic-overflow tests and cause `clojure -X:coverage` to report test failures.
+Cloverage also emits reflection warnings that are not present during normal compilation.
+
+These failures are instrumentation artifacts; they do not reproduce under the normal test command.
+Until the coverage tooling is upgraded or reconfigured so the instrumented suite passes, treat its percentages as approximate and do not use the coverage run in place of `clojure -X:test`.
+
 ## License
 
 Apache License 2.0
