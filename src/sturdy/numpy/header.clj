@@ -14,6 +14,20 @@
   (throw (ex-info "Unsupported .npy dtype descriptor"
                   {:descr descr :reason reason})))
 
+(def ^:private required-field-patterns
+  [[:descr #"[\"']descr[\"']\s*:"]
+   [:fortran-order #"[\"']fortran_order[\"']\s*:"]
+   [:shape #"[\"']shape[\"']\s*:"]])
+
+(defn- reject-duplicate-required-fields [^String hdr]
+  (doseq [[field pattern] required-field-patterns]
+    (let [occurrences (count (re-seq pattern hdr))]
+      (when (> occurrences 1)
+        (throw (ex-info "Duplicate required field in .npy header"
+                        {:field field
+                         :occurrences occurrences
+                         :reason :duplicate}))))))
+
 (defn- parse-descr-value [^String descr-value]
   (let [[_ endian kind size-text]
         (or (re-matches #"^([<>|])([uif])([0-9]+)$" descr-value)
@@ -104,6 +118,7 @@
         (read-header-string npy-byte-data)
 
         hdr       (string/trim header-string)
+        _         (reject-duplicate-required-fields hdr)
         descr     (parse-descr hdr)
         fortran?  (parse-fortran-order hdr)
         shape     (parse-shape hdr)]

@@ -4,7 +4,11 @@
    [clojure.test :refer [deftest is testing]]
    [sturdy.fs :as sfs]
    [sturdy.numpy.test-utils :refer [resource-path]]
-   [sturdy.numpy.header :refer [parse-npy-header]]))
+   [sturdy.numpy.header :refer [parse-npy-header]])
+  (:import
+   (java.io ByteArrayOutputStream)
+   (java.nio ByteBuffer ByteOrder)
+   (java.nio.charset StandardCharsets)))
 
 (set! *warn-on-reflection* true)
 
@@ -14,6 +18,21 @@
         bs      (sfs/slurp-bytes (resource-path filename))
         content (String. ^bytes bs charset)]
     (.getBytes ^String (string/replace-first content old new) charset)))
+
+(defn- npy-header-bytes ^bytes [^String header]
+  (let [header-bytes (.getBytes header StandardCharsets/ISO_8859_1)
+        length-bytes (-> (doto (ByteBuffer/allocate 2)
+                           (.order ByteOrder/LITTLE_ENDIAN)
+                           (.putShort (short (alength header-bytes))))
+                         .array)
+        magic        (.getBytes "\u0093NUMPY" StandardCharsets/ISO_8859_1)]
+    (with-open [out (ByteArrayOutputStream.)]
+      (.write out ^bytes magic 0 (alength ^bytes magic))
+      (.write out 1)
+      (.write out 0)
+      (.write out ^bytes length-bytes 0 (alength ^bytes length-bytes))
+      (.write out ^bytes header-bytes 0 (alength ^bytes header-bytes))
+      (.toByteArray out))))
 
 (deftest parse-npy-header-basic-1d
   (testing "parse-npy-header parses a 1D u4 fixture"
@@ -144,3 +163,30 @@
         (is (= "Unsupported .npy dtype descriptor" (ex-message error)))
         (is (= {:descr descr :reason reason}
                (select-keys (ex-data error) [:descr :reason])))))))
+
+(deftest parse-npy-header-rejects-duplicate-required-fields
+  (doseq [[field header]
+          [[:descr
+            "{'descr': '<i4', \"descr\": '>i4', 'fortran_order': False, 'shape': (2, 3)}\n"]
+           [:fortran-order
+            "{'descr': '<i4', 'fortran_order': False, \"fortran_order\": False, 'shape': (2, 3)}\n"]
+           [:shape
+            "{'descr': '<i4', 'fortran_order': False, 'shape': (2, 3), \"shape\": (3, 2)}\n"]]]
+    (testing (name field)
+      (let [error (try
+                    (parse-npy-header (npy-header-bytes header))
+                    nil
+                    (catch clojure.lang.ExceptionInfo e
+                      e))]
+        (is (= "Duplicate required field in .npy header" (ex-message error)))
+        (is (= {:field field :occurrences 2 :reason :duplicate}
+               (select-keys (ex-data error)
+                            [:field :occurrences :reason])))))))
+
+(deftest parse-npy-header-allows-unambiguous-grammar-variations
+  (let [header (str "{\"shape\" : (2, 3), 'extra': 'ignored', "
+                    "\"fortran_order\" : False, 'descr' : '<i4'}\n")
+        parsed (parse-npy-header (npy-header-bytes header))]
+    (is (= [2 3] (:shape parsed)))
+    (is (= false (:fortran? parsed)))
+    (is (= :i4 (:dtype parsed)))))
